@@ -14,6 +14,8 @@ effectiveness. A potential advisor for this project is Professor Anca Ralescu
 (anca.ralescu@uc.edu), a professor at the University of Cincinnati who teaches CS
 5137, Machine Learning.
 
+More information on the Iris Dataset can be found here: https://en.wikipedia.org/wiki/Iris_flower_data_set
+
 #### Application-Level Objectives
 Must-Have Features: 
  - An implementation of a feed-forward neural network that takes advantage of the GPU
