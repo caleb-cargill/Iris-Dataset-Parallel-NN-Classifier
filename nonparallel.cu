@@ -25,13 +25,18 @@
 #include <stdlib.h>
 #include <sstream>
 #include <vector>
+#include "Iris.h"
 
-int main(void)
-{
+static const int DATASET_SIZE = 150;
+static const int NUM_FEATURES = 5;
+static Iris iris_dataset[DATASET_SIZE];
+
+void init_dataset() {
     std::ifstream infile("iris.csv");
     std::string line, word;
     int i = 0;
-    float dataset[150][5];
+    float raw_dataset[DATASET_SIZE][NUM_FEATURES];
+
 
     while (std::getline(infile, line))
     {
@@ -39,14 +44,24 @@ int main(void)
         std::stringstream s(line);
         int j = 0;
         while (getline(s, word, ',')) {
-            dataset[i][j] = std::stof(word);
+            raw_dataset[i][j] = std::stof(word);
 
-            // print for validation
-            printf("%i: %s, ", j, word);
             j++;
         }
+
+        iris_dataset[i] = *(new Iris(raw_dataset[i]));
         i++;
     }
-    printf("%f", dataset[0][0]);
+}
+
+int main(void)
+{
+    init_dataset();
+
+    // Print Dataset for Validation
+    for (int i = 0; i < DATASET_SIZE; i++) {
+        iris_dataset[i].Print();
+    }
+
     return 0;
 }
