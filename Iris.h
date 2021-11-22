@@ -1,3 +1,17 @@
+/*
+ CS5168/CS6068 - Parallel Computing
+
+ Final Project - Iris Dataset Parallel NN Classifier
+ November, 2021
+
+ Team Members:
+ - Ben Elfner
+ - Caleb Cargill
+
+ File Description:
+ - Class to store Iris information
+*/
+
 #pragma once
 #include <string>
 
@@ -42,6 +56,7 @@ public:
 		}
 	}
 
+	// Method to Print Iris Data
 	void Print() {
 		printf("Sepal Length: %f\n", SepalLength);
 		printf("Sepal Width: %f\n", SepalWidth);
