@@ -57,9 +57,20 @@ int main(void)
 {
     init_dataset();
 
-    // Print Dataset for Validation
+    // Split Dataset into Training and Testing Data
+    // 2/3 Training, 1/3 Testing
+    Iris training_data[DATASET_SIZE * 2 / 3];
+    Iris testing_data[DATASET_SIZE / 3];
+    int train_count, test_count = 0;
     for (int i = 0; i < DATASET_SIZE; i++) {
-        iris_dataset[i].Print();
+        if (i % 3 == 0) {
+            testing_data[test_count] = iris_dataset[i];
+            test_count++;
+        }
+        else {
+            training_data[train_count] = iris_dataset[i];
+            train_count++;
+        }
     }
 
     return 0;
