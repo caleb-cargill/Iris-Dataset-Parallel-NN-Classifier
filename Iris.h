@@ -23,6 +23,7 @@ public:
 	double SepalWidth;
 	double PetalLength;
 	double PetalWidth;
+	double SpeciesVal;
 	std::string Species;
 	bool IsSetosa;
 
@@ -32,6 +33,7 @@ public:
 		SepalWidth = 0;
 		PetalLength = 0;
 		PetalWidth = 0;
+		SpeciesVal = 0;
 		Species = "";
 		IsSetosa = false;
 	}
@@ -42,6 +44,7 @@ public:
 		SepalWidth = data[1];
 		PetalLength = data[2];
 		PetalWidth = data[3];
+		SpeciesVal = data[4];
 		int spec = data[4];
 		switch (spec) {
 		case 0:
@@ -63,5 +66,10 @@ public:
 		printf("Petal Length: %f\n", PetalLength);
 		printf("Petal Width: %f\n", PetalWidth);
 		printf("Species: %s\n", Species);
+	}
+
+	// Computes dot product between Iris features and weight array
+	double dot(float(&w)[5]) {
+		return w[0] * SepalLength + w[1] * SepalWidth + w[2] * PetalLength + w[3] * PetalWidth + w[4];
 	}
 };
