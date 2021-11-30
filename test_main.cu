@@ -25,9 +25,9 @@ int main(void)
 
     
 
-    int topology[] = {5, 3, 3};
+    // int topology[] = {5, 3, 3};
 
-    NeuralNetwork net(topology, 3);
+    // NeuralNetwork net(topology, 3);
     printf("\n%f\n", dataset[0]);
     // float *inputs, *weights, *outputs;
     // int a = 2, b = 3,c = 4;
