@@ -30,7 +30,7 @@ int main(void)
     
 
     int topology[] = {4, 3, 3};
-    NeuralNetwork net(topology, 2);
+    NeuralNetwork net(topology, 3);
     net.train(train,ground_truth,1,.1,train_size);
 
     // printf("\n%f\n", dataset[0]);
