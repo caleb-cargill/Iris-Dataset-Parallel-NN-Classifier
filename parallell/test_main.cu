@@ -19,26 +19,19 @@ int main(void)
     }
     // printf("File read successfully\n");
     
-    int train_size = 130;
+    int train_size = 10;
 
     float *train = (float *) malloc(train_size * width * sizeof(float));
     float *test = (float *) malloc((height - train_size) * width * sizeof(float));
     split_data(dataset, height, width, train, test, train_size);
     float *ground_truth = (float *) malloc(3* train_size * sizeof(float));
-    create_ground_truth(ground_truth, train, train_size, width);
+    create_ground_truth(train, ground_truth, train_size, width);
     // validate_split(train, test, height, width, train_size);
-
     
 
     int topology[] = {4, 3, 3};
-    // float *inputss;
-    // inputss = (float *) malloc(5 * 2 * sizeof(float));
-    // for(int i = 0; i < 5*2; i++)
-    // {
-    //     inputss[i] = i;
-    // }
     NeuralNetwork net(topology, 2);
-    net.train(train,1,.1,150);
+    net.train(train,ground_truth,1,.1,train_size);
 
     // printf("\n%f\n", dataset[0]);
     // float *inputs, *weights, *outputs;

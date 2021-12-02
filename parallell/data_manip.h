@@ -20,9 +20,9 @@ void split_data (float * dataset, int height, int width, float * train , float *
     int *sample_array = (int *) malloc(height * sizeof(int));
     create_sample_array(sample_array, height);
     // validate shuffle
-    for (int i = 0; i < height; i++) {
-        printf("%d\n", sample_array[i]);
-    }
+    // for (int i = 0; i < height; i++) {
+    //     printf("%d\n", sample_array[i]);
+    // }
     for (int i = 0; i < height; i++) {
 
         for(int j = 0; j < width; j++) {
@@ -56,17 +56,17 @@ void validate_split(float *train, float *test, int height, int width, int train_
 void create_ground_truth(float * input, float* output, int height, int width)
 {
     for (int x = 0; x < height; x++) {
-            if (input[x * width + 5] - 0 < .01) {
+            if (input[x * width + 4] - 0 < .01) {
                 output[x * 3 + 0] = 1;
                 output[x * 3 + 1] = 0;
                 output[x * 3 + 2] = 0;
             }
-            else if (input[x * width + 5] - 1 < .01) {
+            else if (input[x * width + 4] - 1 < .01) {
                 output[x * 3 + 0] = 0;
                 output[x * 3 + 1] = 1;
                 output[x * 3 + 2] = 0;
             }
-            else if (input[x * width + 5] - 2 < .01) {
+            else if (input[x * width + 4] - 2 < .01) {
                 output[x * 3 + 0] = 0;
                 output[x * 3 + 1] = 0;
                 output[x * 3 + 2] = 1;
