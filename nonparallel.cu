@@ -130,6 +130,8 @@ void train() {
 		float prediction = 0.0;
 		float accuracy = 0.0;
 
+		
+
 		for (int j = 0; j < TRAINING_SIZE; j++) {
 			prediction = predict(training_data[j]);
 
