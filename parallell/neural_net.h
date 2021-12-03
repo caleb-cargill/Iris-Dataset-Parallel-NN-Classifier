@@ -33,6 +33,7 @@ class NeuralNetwork {
         float **weights;
         float **layer_outputs;
     public:
+        // Constructor
         NeuralNetwork(int *topology, int num_layers)
         {
             printf("Constructing Neural Network\n");
@@ -72,6 +73,8 @@ class NeuralNetwork {
             }
 
         }
+
+        // Destructor
         NeuralNetwork::~NeuralNetwork()
         {
             printf("Destroying Neural Network\n");
