@@ -26,6 +26,7 @@ public:
 	double SpeciesVal;
 	std::string Species;
 	bool IsSetosa;
+	double prediction;
 
 	// Default Constructor
 	Iris() {

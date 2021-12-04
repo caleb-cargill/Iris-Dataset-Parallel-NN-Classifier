@@ -25,64 +25,14 @@
 #include <stdlib.h>
 #include <sstream>
 #include <vector>
-#include "Iris.h"
+#include "../Iris.h"
 #include <random>
-#include "gputimer.h"
-
-// General Constants
-static const int DATASET_SIZE = 150; // number of rows in the dataset
-static const int TRAINING_SIZE = DATASET_SIZE * 2 / 3; // number of rows in dataset to use as training
-static const int TESTING_SIZE = DATASET_SIZE / 3; // number of rows in the dataset ot use for testing
-static const int NUM_FEATURES = 5; // number of features in the dataset; 4 input, 1 output
-static const std::string DATASET_FILE_NAME = "iris.csv"; // file name that the dataset is stored in
+#include "../gputimer.h"
+#include "neural_net.h"
 
 // Training Constants
 static const int EPOCHS = 50; // number of iterations to train with
 static const double LEARNING_RATE = 0.001; // learning rate for updating weights
-
-// Dataset
-static Iris iris_dataset[DATASET_SIZE]; // variable to store dataset in
-static Iris training_data[TRAINING_SIZE]; // variable to store training data
-static Iris testing_data[TESTING_SIZE]; // variable to store testing data
-static float weights[NUM_FEATURES]; // weights for single layer network
-static int weight_updates = 0; // used to track the number of times the weights array is updated
-
-// Method to initialize the Iris dataset
-void init_dataset() {
-	std::ifstream infile(DATASET_FILE_NAME);
-	std::string line, word;
-	int i = 0;
-	float raw_dataset[DATASET_SIZE][NUM_FEATURES];
-
-	while (std::getline(infile, line))
-	{
-		std::stringstream s(line);
-		int j = 0;
-		while (getline(s, word, ',')) {
-			raw_dataset[i][j] = std::stof(word);
-			j++;
-		}
-
-		iris_dataset[i] = *(new Iris(raw_dataset[i]));
-		i++;
-	}
-}
-
-// splits the data set into training and testing data
-void split_dataset() {
-	// Split Dataset into Training and Testing Data
-	int train_count, test_count = 0;
-	for (int i = 0; i < DATASET_SIZE; i++) {
-		if (i % 3 == 0) {
-			testing_data[test_count] = iris_dataset[i];
-			test_count++;
-		}
-		else {
-			training_data[train_count] = iris_dataset[i];
-			train_count++;
-		}
-	}
-}
 
 // Used to update weight array after predictions
 void update_weights(Iris iris, float prediction) {
@@ -130,7 +80,7 @@ void train() {
 		float prediction = 0.0;
 		float accuracy = 0.0;
 
-		
+
 
 		for (int j = 0; j < TRAINING_SIZE; j++) {
 			prediction = predict(training_data[j]);
@@ -180,17 +130,11 @@ int main(void)
 	GpuTimer timer;
 	timer.Start();
 
-	// Initialize dataset
-	init_dataset();
+	NeuralNetwork nn = *(new NeuralNetwork(EPOCHS, LEARNING_RATE));
 
-	// Split dataset into training and testing data
-	split_dataset();
+	nn.train();
 
-	// Train on training data
-	train();
-
-	// Test on testing data
-	test();
+	nn.test();
 
 	// Print some statistics
 	timer.Stop();
