@@ -6,11 +6,12 @@
 #include "../Iris.h"
 #include "cuda.h"
 #include <math.h>
+#include "../data_manip.h"
 
 // General Constants
 static const int DATASET_SIZE = 150; // number of rows in the dataset
-static const int TRAINING_SIZE = DATASET_SIZE / 15; // number of rows in dataset to use as training
-static const int TESTING_SIZE = DATASET_SIZE * 14 / 15; // number of rows in the dataset ot use for testing
+static const int TRAINING_SIZE = 50; // number of rows in dataset to use as training
+static const int TESTING_SIZE = 100; // number of rows in the dataset ot use for testing
 static const int NUM_FEATURES = 5; // number of features in the dataset; 4 input, 1 output
 static const int NUM_LAYERS = 3; // number of layers in the neural network
 static const std::string DATASET_FILE_NAME = "iris.csv"; // file name that the dataset is stored in
@@ -29,11 +30,10 @@ private:
 	int feed_count = 0;
 
 	// Dataset
-	static Iris iris_dataset[DATASET_SIZE]; // variable to store dataset in
-	static Iris training_data[TRAINING_SIZE]; // variable to store training data
-	static Iris testing_data[TESTING_SIZE]; // variable to store testing data
-	static float weights[NUM_NODES + NUM_LAYERS]; // weights for network
-	static int weight_updates = 0; // used to track the number of times the weights array is updated
+	Iris iris_dataset[DATASET_SIZE]; // variable to store dataset in
+	Iris training_data[TRAINING_SIZE]; // variable to store training data
+	Iris testing_data[TESTING_SIZE]; // variable to store testing data
+	float weights[NUM_NODES + NUM_LAYERS]; // weights for network	
 
 	// Method to initialize the Iris dataset
 	void init_dataset() {
@@ -65,7 +65,7 @@ private:
 		// Split Dataset into Training and Testing Data
 		int train_count, test_count = 0;
 		for (int i = 0; i < DATASET_SIZE; i++) {
-			if (i % 10 == 0) {
+			if (i % 3 == 0) {
 				training_data[train_count] = iris_dataset[sample_array[i]];
 				train_count++;
 			}
@@ -142,7 +142,9 @@ public:
 				calculate_prev_grad();
 			}
 			else {
-				prev_grad = d_x;
+				for (int j = 0; j < TRAINING_SIZE; j++) {
+					prev_grad[j] = d_x[j];
+				}
 			}
 
 			calculate_d_activ(i);
@@ -180,7 +182,7 @@ public:
 			for (int j = 0; j < TRAINING_SIZE; j++) {
 				d_x[j] = 0.0;
 				for (int k = 0; k < TOPOLOGY[i]; k++) {
-					d_x[j] += d_active[j] * weights[k]
+					d_x[j] += d_active[j] * weights[k];
 				}
 			}
 
@@ -252,6 +254,49 @@ public:
 	}
 
 	/// <summary>
+	/// Calculates the model output and stores each layer's output for use in backpropagation
+	/// </summary>
+	void feed_forward() {
+		int weight_count = 0;
+		float input = 0.0;
+
+		// first layer
+		for (int i = 0; i < TESTING_SIZE; i++) {
+			input += testing_data[i].SepalLength * weights[weight_count];
+			input += testing_data[i].SepalWidth * weights[weight_count + 1];
+			input += testing_data[i].PetalLength * weights[weight_count + 2];
+			input += testing_data[i].PetalWidth * weights[weight_count + 3];
+			input += weights[weight_count + 4];
+			y[i] = sigmoid(input);
+			y_history[i] = y[i];
+		}
+
+		// second layer
+		weight_count += 5;
+		input = 0.0;
+		for (int i = 0; i < TESTING_SIZE; i++) {
+			input += y[i] * weights[weight_count];
+			input += y[i] * weights[weight_count + 1];
+			input += y[i] * weights[weight_count + 2];
+			input += weights[weight_count + 3];
+			y[i] = sigmoid(input);
+			y_history[TESTING_SIZE + i] = y[i];
+		}
+
+		// third layer
+		weight_count += 4;
+		input = 0.0;
+		for (int i = 0; i < TESTING_SIZE; i++) {
+			input += y[i] * weights[weight_count];
+			input += y[i] * weights[weight_count + 1];
+			input += y[i] * weights[weight_count + 2];
+			input += weights[weight_count + 3];
+			y[i] = sigmoid(input);
+			y_history[(TESTING_SIZE * 2) + i] = y[i];
+		}
+	}
+
+	/// <summary>
 	/// Trains the neural network to produce a set of weights + biases
 	/// Prints training accuracy at the end of training
 	/// </summary>
@@ -264,13 +309,16 @@ public:
 
 			float loss = 0.0;
 			for (int j = 0; j < TRAINING_SIZE; j++) {
-				loss += (training_data[j] - y[j]) ^ 2;
+				loss += (training_data[j].SpeciesVal - y[j]) * (training_data[j].SpeciesVal - y[j]);
 			}
-			loss = loss / 2;
+			loss = loss / TRAINING_SIZE;
 
-			print("Accuracy for Epoch #%i: %f", i, loss);
+			if (i % 10 == 0) {
+				printf("\nLoss for Epoch #%i: %f", i, loss);
+			}
 
 			backpropagation();
+			training_accuracy += (1 - loss);
 		}
 
 		training_accuracy = training_accuracy / epochs;
@@ -284,6 +332,16 @@ public:
 	/// </summary>
 	void test() {
 		actual_accuracy = 0.0;
+
+		feed_forward();
+
+		float loss = 0.0;
+		for (int j = 0; j < TESTING_SIZE; j++) {
+			loss += (testing_data[j].SpeciesVal - y[j]) * (testing_data[j].SpeciesVal - y[j]);
+		}
+		loss = loss / TESTING_SIZE;
+
+		actual_accuracy += (1 - loss);
 
 		printf("\nDone Testing. Actual (Testing) Accuracy: %f", actual_accuracy);
 	}
