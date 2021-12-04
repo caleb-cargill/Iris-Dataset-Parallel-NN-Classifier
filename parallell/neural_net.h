@@ -4,52 +4,20 @@
 #include <random> 
 #include <algorithm>
 #include "mat_mult.h"
+#include "matrix.h"
 #include "cuda.h"
-
-__global__ void calculate_output_error_kernal(float* output, float *ground_truth, float *error, int width,int total)
-{
-    int idx = threadIdx.x + blockDim.x * blockIdx.x;
-    if(idx < total)
-    {
-        for (int i = 0; i < width; i ++)
-        {
-            error[idx*width+i] = (output[idx*width+i] - ground_truth[idx*width+i])*(1-output[idx*width+i])*output[idx*width+i];
-        }
-    }
-}
-
-__global__ void calculate_hidden_error_kernal(float* error, float *weights, float *next_error, int current_width, int next_width,int total)
-{
-    int idx = threadIdx.x + blockDim.x * blockIdx.x;
-    if(idx < total)
-    {
-        for (int i = 0; i < current_width; i++)
-        {   
-            float acc = 0;
-            for (int j = 0; j < next_width; j++)
-            {
-                acc += weights[i*next_width+j]*next_error[idx*next_width+j];
-            }
-            error[idx*current_width+i] = acc*(1-error[idx*current_width+i])*error[idx*current_width+i];
-        }
-    }
-}
 
 
 class NeuralNetwork {
     private:
         int *topology;
-        int num_inputs;
-        int num_outputs;
-        int num_hidden_layers;
-        int num_layers;
-        float *error;
-        float *d_error; // error stored on GPU
-        float **layer_errors;
-        float **weights;
-        float **layer_outputs;
+        int num_inputs, num_outputs;
+        int num_hidden_layers, num_layers;
+        float accuracy;
+        struct Matrix *error, *d_error;
+        struct Matrix *d_inputs, *d_ground_truth;
+        struct Matrix **weights, **layer_outputs, **layer_errors;
     public:
-        // Constructor
         NeuralNetwork(int *topology, int num_layers)
         {
             printf("Constructing Neural Network\n");
@@ -59,8 +27,9 @@ class NeuralNetwork {
             this->num_outputs = topology[num_layers - 1];
             this->num_hidden_layers = num_layers - 2;
 
-            this->weights = new float*[num_layers - 1];
-            this->layer_errors = new float*[num_layers - 1];
+            this->weights = new struct Matrix*[num_layers - 1];
+            this->layer_errors = new struct Matrix*[num_layers - 1];
+            this->layer_outputs = new struct Matrix*[num_layers - 1];
             std::default_random_engine generator;
             // create weights matrix for each layer
             for (int i = 0; i < num_layers - 1; i++)
@@ -68,18 +37,16 @@ class NeuralNetwork {
                 // weights range from -1/sqrt(n) to 1/sqrt(n) where n is the number of nodes in the previous layer
                 std::uniform_real_distribution<float> distribution(-1.0/sqrt(topology[i]),1.0/sqrt(topology[i]));
 
-                printf("num weights %i\n",(topology[i] + 1) * topology[i + 1]);
+                // printf("num weights %i\n",(topology[i] + 1) * topology[i + 1]);
+                struct Matrix * temp = create_matrix(topology[i] + 1, topology[i + 1]);
 
-                float *temp = (float *) malloc((topology[i] + 1) * topology[i + 1] * sizeof(float));
-                for(int y = 0; y < (topology[i] + 1) * topology[i + 1]; y++)
+                for(int y = 0; y < temp->height* temp->width; y++)
                 {
-                    temp[y] = distribution(generator);
+                    temp->data[y] = distribution(generator);
                 }
-
-                // create GPU array and populate it
-                cudaMalloc(&(this->weights[i]), (topology[i] + 1) * topology[i + 1] * sizeof(float));
-                cudaMemcpy(this->weights[i], temp, (topology[i] + 1) * topology[i + 1] * sizeof(float), cudaMemcpyHostToDevice);
-                
+                this->weights[i] = send_matrix_to_gpu(temp);
+                // print_matrix(temp);
+                printf("\n");
                 // to check if weigths are being set correctly
                 // float *temp2 = (float *) malloc((topology[i] + 1) * topology[i + 1] * sizeof(float));
                 // cudaMemcpy(temp2,this->weights[i], (topology[i] + 1) * topology[i + 1] * sizeof(float), cudaMemcpyDeviceToHost);
@@ -87,89 +54,73 @@ class NeuralNetwork {
                 // {
                 //     printf("%f\n",temp2[y]);
                 // }
+                matrix_destroy(temp);
             }
 
         }
-
-        // Destructor
         NeuralNetwork::~NeuralNetwork()
         {
             printf("Destroying Neural Network\n");
             for (int i = 0; i < num_layers - 1; i++)
             {
-                cudaFree(this->weights[i]);
+                matrix_destroy(this->weights[i]);
+                matrix_destroy(this->layer_errors[i]);
+                matrix_destroy(this->layer_outputs[i]);
             }
             delete[] this->weights;
             delete[] this->topology;
+            delete[] this->layer_errors;
+            delete[] this->layer_outputs;
+            matrix_destroy(this->d_inputs);
+            matrix_destroy(this->d_ground_truth);
+            matrix_destroy(this->d_error);
+            matrix_destroy(this->error);
+
         }
 
-        void forward_propagate(float *input,int num_inputs)
+        void forward_propagate()
         {
             int i = 0;
-            nn_mat_mul(input, this->weights[i], this->layer_outputs[i], num_inputs, this->topology[i], this->topology[i + 1]);
+            // printf("i: %i\n",i);
+            nn_mat_mul(this->d_inputs, this->weights[i], this->layer_outputs[i]);
             i++;
-            printf("i: %i\n",i);
+            // printf("i: %i\n",i);
             for (; i < this->num_layers - 1; i++)
             {
-                nn_mat_mul(this->layer_outputs[i-1], this->weights[i], this->layer_outputs[i] ,num_inputs, this->topology[i] + 1, this->topology[i + 1]);
-                printf("i: %i\n",i);
+                nn_mat_mul(this->layer_outputs[i-1], this->weights[i], this->layer_outputs[i]);
+                // printf("i: %i\n",i);
+                // print_matrix(this->layer_outputs[i]);
             }
         }
 
-        void calculate_output_error(float* ground_truth, int num_samples)
+        void calculate_output_error()
         {
-            int num_threads = num_samples;
+            this->d_error = create_cuda_matrix(this->d_ground_truth->height, this->d_ground_truth->width);
+
+            int num_threads = this->d_ground_truth->height;
             int num_blocks = 1;
-            if (num_samples > 512)
+            if (this->d_ground_truth->height > 512)
             {
                 num_threads = 512;
-                num_blocks = ceil(float(num_samples) / 512.0);
+                num_blocks = ceil(float(this->d_ground_truth->height) / 512.0);
             }
+            
+            // print_matrix(ground_truth);
+            // printf("\n");
+            // print_matrix(this->layer_outputs[this->num_layers - 2]);
+            // printf("\n");
+            // print_matrix(this->d_error);
 
-            // float *t1, *t2, *t3;
-            // t1 = (float *) malloc(num_samples * this->num_outputs * sizeof(float));
-            // t2 = (float *) malloc(num_samples * this->num_outputs * sizeof(float));
-            // t3 = (float *) malloc(num_samples * this->num_outputs * sizeof(float));
-            // cudaMemcpy(t1, this->layer_outputs[this->num_layers - 2], num_samples * this->num_outputs * sizeof(float), cudaMemcpyDeviceToHost);
-            // cudaMemcpy(t2, ground_truth, num_samples * this->num_outputs * sizeof(float), cudaMemcpyDeviceToHost);
-            // cudaMemcpy(t3, this->d_error, num_samples * this->num_outputs * sizeof(float), cudaMemcpyDeviceToHost);
-
-            // for (int i = 0; i < num_samples; i++)
-            // {
-            //     for (int j = 0; j < this->num_outputs; j++)
-            //     {
-            //         printf("%f ",t1[i*this->num_outputs + j]);
-            //     }
-            //     printf("\n");
-            // }
-            // printf("\n");
-            // for (int i = 0; i < num_samples; i++)
-            // {
-            //     for (int j = 0; j < this->num_outputs; j++)
-            //     {
-            //         printf("%f ",t2[i*this->num_outputs + j]);
-            //     }
-            //     printf("\n");
-            // }
-            // printf("\n");
-            // for (int i = 0; i < num_samples; i++)
-            // {
-            //     for (int j = 0; j < this->num_outputs; j++)
-            //     {
-            //         printf("%f ",t3[i*this->num_outputs + j]);
-            //     }
-            //     printf("\n");
-            // }
-            // printf("\n");
-            calculate_output_error_kernal<<<num_blocks, num_threads>>>(this->layer_outputs[this->num_layers - 2], ground_truth, this->d_error,this->num_outputs,num_samples);
-            cudaMemcpy(this->error, this->d_error, num_samples * this->num_outputs * sizeof(float), cudaMemcpyDeviceToHost);
+            calculate_output_error_kernal<<<num_blocks, num_threads>>>(this->layer_outputs[this->num_layers - 2]->data, this->d_ground_truth->data, this->d_error->data,this->num_outputs,this->d_ground_truth->height);
+            this->error = retrieve_matrix_from_gpu(this->d_error);
         }
 
-        void calculate_hidden_errors(int num_samples)
+        void calculate_hidden_errors()
         {
+            int num_samples =  this->layer_errors[0]->height;
             for (int x = this->num_layers - 2; x >= 0; x--)
             {
-                printf("x: %i\n",x);
+                // printf("x: %i\n",x);
                 int num_threads = num_samples;
                 int num_blocks = 1;
                 if (num_samples > 512)
@@ -177,69 +128,197 @@ class NeuralNetwork {
                     num_threads = 512;
                     num_blocks = ceil(float(num_samples) / 512.0);
                 }
-                if (x == this->num_layers - 1)
+                if (x == this->num_layers - 2)
                 {
-                    calculate_hidden_error_kernal<<<num_blocks, num_threads>>>(this->layer_errors[x], this->weights[x], this->d_error,  this->topology[x] + 1, this->topology[x + 1], num_samples);
-                   
+                    // print_matrix_dims(this->layer_errors[x]);
+                    // print_matrix(this->layer_errors[x]);
+                    // printf("\n");
+                    // print_matrix_dims(this->weights[x]);
+                    // print_matrix(this->weights[x]);
+                    // printf("\n");
+                    // print_matrix_dims(this->d_error);
+                    // print_matrix(this->d_error);
+                    // printf("\n");
+                    // print_matrix_dims(this->layer_outputs[x]);
+                    // print_matrix(this->layer_outputs[x]);
+                    // printf("\n");
+                    calculate_hidden_error_kernal<<<num_blocks, num_threads>>>(this->layer_errors[x]->data, this->weights[x]->data, this->d_error->data, this->layer_outputs[x]->data ,this->topology[x] + 1, this->topology[x + 1], num_samples);
                 }
                 else
                 {
-                    calculate_hidden_error_kernal<<<num_blocks, num_threads>>>(this->layer_errors[x], this->weights[x], this->layer_errors[x+1],  this->topology[x] + 1, this->topology[x + 1], num_samples);
+                    // print_matrix_dims(this->layer_errors[x]);
+                    // print_matrix(this->layer_errors[x]);
+                    // printf("\n");
+                    // print_matrix_dims(this->weights[x]);
+                    // print_matrix(this->weights[x]);
+                    // printf("\n");
+                    // print_matrix_dims(this->d_error);
+                    // print_matrix(this->d_error);
+                    // printf("\n");
+                    calculate_hidden_error_kernal<<<num_blocks, num_threads>>>(this->layer_errors[x]->data, this->weights[x]->data, this->layer_errors[x+1]->data, this->layer_outputs[x]->data ,this->topology[x] + 1, this->topology[x + 1], num_samples);
                 }
-                float *temp = (float *) malloc((this->topology[x] + 1) * num_samples * sizeof(float));
-                cudaMemcpy(temp, this->layer_errors[x],  (this->topology[x] + 1) * num_samples * sizeof(float), cudaMemcpyDeviceToHost);
-                for (int i = 0; i < num_samples; i++)
-                {
-                    for (int j = 0; j < (this->topology[x] + 1); j++)
-                    {
-                        printf("%f ",temp[i*(this->topology[x] + 1) + j]);
-                    }
-                    printf("\n");
-                }
+                // print_matrix(this->layer_errors[x]);
+                // printf("\n\n\n");
             }
 
         }
-            
 
-        void back_propagate(float learning_rate,int num_samples)
+        void adjust_weights(float learning_rate)
         {
-            calculate_hidden_errors(num_samples);
+            // formula 
+            // weight = weight - learning_rate * error * input
+
+            for (int i = 0; i < this->num_layers - 1; i++)
+            {   
+                // printf("i: %i\n",i);
+                //  error * input
+                struct Matrix * temp  = create_cuda_matrix(this->layer_errors[i]->height, this->layer_errors[i]->width);
+                if (i == 0)
+                {
+                    element_wise_multiplication(this->layer_errors[i], this->d_inputs, temp, true);
+                }
+                else
+                {
+                    // print_matrix_dims(this->layer_errors[i]);
+                    // print_matrix_dims(this->layer_outputs[i - 1]);
+                    element_wise_multiplication(this->layer_errors[i], this->layer_outputs[i - 1], temp, true);
+                }
+
+                // average error over all inputs
+                struct Matrix *averages = create_cuda_matrix(1, this->topology[i] + 1);
+                int num_threads = this->topology[i] + 1;
+                int num_blocks = 1;
+                if (num_threads > 512)
+                {
+                    num_threads = 512;
+                    num_blocks = ceil(float(this->topology[i] + 1) / 512.0);
+                }
+                average_columns_kernal<<<num_blocks, num_threads>>>(temp->data, averages->data, this->layer_errors[i]->height,this->layer_errors[i]->width);
+
+                // weight = weight - learning_rate * averages
+                struct Matrix *delta_weights = create_cuda_matrix(this->topology[i] + 1, this->topology[i + 1]);
+                
+                dim3 threadsPerBlock(weights[i]->width, weights[i]->height);
+                dim3 blocksPerGrid(1, 1);
+                if (weights[i]->width * weights[i]->height > 512){
+                    threadsPerBlock.x = 512;
+                    threadsPerBlock.y = 512;
+                    blocksPerGrid.x = ceil(double(weights[i]->width)/double(threadsPerBlock.x));
+                    blocksPerGrid.y = ceil(double(weights[i]->height)/double(threadsPerBlock.y));
+                }
+                // print_matrix(weights[i]);
+                // printf("\n");
+                update_weights_kernal<<<blocksPerGrid, threadsPerBlock>>>(weights[i]->data, averages->data, weights[i]->height, weights[i]->width, learning_rate);
+                // print_matrix(weights[i]);
+                // printf("\n");
+                matrix_destroy(temp);
+                matrix_destroy(averages);
+                matrix_destroy(delta_weights);
+            }
+        }
+        
+
+        void back_propagate(float learning_rate)
+        {
+            calculate_hidden_errors();
+            adjust_weights(learning_rate);
         }
 
-        void train(float *input, float *ground_truth,int epochs, float learning_rate,int num_samples)
+        void calculate_accuracy()
         {
-            // create array to store inputs and ground truth on gpu and populate it
-            float *d_inputs, *d_ground_truth;
-            cudaMalloc(&d_inputs, (this->num_inputs +1) * num_samples * sizeof(float));
-            cudaMalloc(&d_ground_truth, this->num_outputs * num_samples * sizeof(float));
-            
-            cudaMemcpy(d_inputs, input, (this->num_inputs + 1) * num_samples * sizeof(float), cudaMemcpyHostToDevice); // + 1 for type column
-            cudaMemcpy(d_ground_truth, ground_truth, this->num_outputs * num_samples * sizeof(float), cudaMemcpyHostToDevice);
+            struct Matrix * output = retrieve_matrix_from_gpu(this->layer_outputs[this->num_layers - 2]);
+            struct Matrix * ground_truth = retrieve_matrix_from_gpu(this->d_ground_truth);
+            // printf("Here!\n");
+            int num_correct = 0;
+            for (int i = 0; i < this->d_ground_truth->height; i++)
+            {
+                // printf("i: %i\n",i);
+                int max_index = 0;
+                float max_value = output->data[i * output->width];
+                for (int j = 1; j < output->width; j++)
+                {
+                    if (output->data[i * output->width + j] > max_value)
+                    {
+                        max_value = output->data[i * output->width + j];
+                        max_index = j;
+                    }
+                    
+                }
+                if (ground_truth->data[i * output->width + max_index] == 1)
+                {
+                    num_correct++;
+                }
+            }
+            this->accuracy = float(num_correct) / float(this->d_ground_truth->height);
 
-            this->error = (float *) malloc(num_samples * this->num_outputs * sizeof(float));
-            cudaMalloc(&(this->d_error), num_samples * this->num_outputs * sizeof(float));
+        }
+        
+        void train(struct Matrix *input, struct Matrix *ground_truth,int epochs, float learning_rate)
+        {
+            int num_samples = input->height;
+            // create array to store inputs and ground truth on gpu and populate it
+            
+            this->d_inputs = send_matrix_to_gpu(input);
+            this->d_ground_truth = send_matrix_to_gpu(ground_truth);
+
+            this->error = create_cuda_matrix(num_samples, this->num_outputs);
 
             for (int i = 0; i < this->num_layers - 1; i++)
             {
-                cudaMalloc(&(this->layer_errors[i]), (this->topology[i] + 1) * num_samples * sizeof(float));
+                this->layer_errors[i] = create_cuda_matrix(num_samples,this->topology[i] + 1);
             }
 
-
-            // create arrays to store output of each layer on gpu
-            this->layer_outputs = new float*[num_layers-1];
+            // // create arrays to store output of each layer on gpu
             for (int i = 1; i < num_layers; i++)
             {
-                cudaMalloc(&(layer_outputs[i-1]), (topology[i]+1) * num_samples * sizeof(float));
+                this->layer_outputs[i-1] = create_cuda_matrix(num_samples, this->topology[i]);
+                // cudaMalloc(&(layer_outputs[i-1]), (topology[i]+1) * num_samples * sizeof(float));
             }
 
 
             printf("Training Neural Network\n");
             for (int i = 0; i < epochs; i++)
             {
-                printf("Epoch %i\n", i);
-                forward_propagate(d_inputs, num_samples);
-                calculate_output_error(d_ground_truth,num_samples);
-                back_propagate(learning_rate,num_samples);
+                forward_propagate();
+                // print_matrix(this->weights[0]);
+                
+                calculate_output_error();
+                // print_matrix(this->error);
+                back_propagate(learning_rate);
+                // if (i%1000 == 0)
+                // {
+                //     printf("Epoch %i\n", i);
+                //     calculate_accuracy();
+                //     printf("Accuracy: %f\n", this->accuracy);
+                //     printf("layer_errors[0]:\n");
+                //     print_matrix(this->layer_errors[0]);
+                //     printf("layer_outputs[0]:\n");
+                //     print_matrix(this->layer_outputs[this->num_layers - 2]);
+                //     printf("d_error:\n");
+                //     print_matrix(this->d_error);
+                //     printf("weights[0]:\n");
+                //     print_matrix(this->weights[0]);
+                // }
+                if (i % 10 == 0)
+                {
+                    printf("Epoch %i\n", i);
+                    calculate_accuracy();
+                    printf("Accuracy: %f\n", this->accuracy);
+                }
+                if (i == 9998 || i == 9999)
+                {
+                    // printf("Epoch %i\n", i);
+                    // calculate_accuracy();
+                    // printf("Accuracy: %f\n", this->accuracy);
+                    // printf("layer_errors[1]:\n");
+                    // print_matrix(this->layer_errors[this->num_layers - 2]);
+                    // printf("layer_outputs[%d]:\n",this->num_layers - 2);
+                    // print_matrix(this->layer_outputs[this->num_layers - 2]);
+                    // printf("d_error:\n");
+                    // print_matrix(this->d_error);
+                    // printf("weights[1]:\n");
+                    // print_matrix(this->weights[this->num_layers -2]);
+                }
             }
 
             // print results

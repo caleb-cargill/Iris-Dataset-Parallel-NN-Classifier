@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <random> 
 #include <chrono>
+#include "matrix.h"
 
 void create_sample_array(int *sample_array, int sample_size)
 {
@@ -16,20 +17,20 @@ void create_sample_array(int *sample_array, int sample_size)
 
 }
 
-void split_data (float * dataset, int height, int width, float * train , float * test, int train_size) {
-    int *sample_array = (int *) malloc(height * sizeof(int));
-    create_sample_array(sample_array, height);
+void split_data (struct Matrix * dataset, struct Matrix *train, struct Matrix *test) {
+    int *sample_array = (int *) malloc(dataset->height * sizeof(int));
+    create_sample_array(sample_array, dataset->height);
     // validate shuffle
     // for (int i = 0; i < height; i++) {
     //     printf("%d\n", sample_array[i]);
     // }
-    for (int i = 0; i < height; i++) {
+    for (int i = 0; i < dataset->height; i++) {
 
-        for(int j = 0; j < width; j++) {
-            if(i < train_size) {
-                train[i * width + j] = dataset[sample_array[i] * width + j];
+        for(int j = 0; j < dataset->width; j++) {
+            if(i < train->height) {
+                train->data[i * dataset->width + j] = dataset->data[sample_array[i] * dataset->width + j];
             } else {
-                test[(i - train_size) * width + j] = dataset[sample_array[i] * width + j];
+                test->data[(i - train->height) * dataset->width + j] = dataset->data[sample_array[i] * dataset->width + j];
             }
         }
     }
@@ -53,28 +54,58 @@ void validate_split(float *train, float *test, int height, int width, int train_
     }
 }
 
-void create_ground_truth(float * input, float* output, int height, int width)
+void normalize_data(struct Matrix *dataset)
 {
-    for (int x = 0; x < height; x++) {
-            if (input[x * width + 4] - 0 < .01) {
-                output[x * 3 + 0] = 1;
-                output[x * 3 + 1] = 0;
-                output[x * 3 + 2] = 0;
+    struct Matrix *max_val = create_matrix(1, dataset->width);
+    struct Matrix *min_val = create_matrix(1, dataset->width);
+    for (int i = 0; i < dataset->width; i++) {
+        max_val->data[i] = dataset->data[i];
+        min_val->data[i] = dataset->data[i];
+    }
+    for (int i = 0; i < dataset->height; i++) {
+        for (int j = 0; j < dataset->width - 1; j++) {
+            if (dataset->data[i * dataset->width + j] < min_val->data[j]) {
+                min_val->data[j] = dataset->data[i * dataset->width + j];
             }
-            else if (input[x * width + 4] - 1 < .01) {
-                output[x * 3 + 0] = 0;
-                output[x * 3 + 1] = 1;
-                output[x * 3 + 2] = 0;
+            if (dataset->data[i * dataset->width + j] > max_val->data[j]) {
+                max_val->data[j] = dataset->data[i * dataset->width + j];
             }
-            else if (input[x * width + 4] - 2 < .01) {
-                output[x * 3 + 0] = 0;
-                output[x * 3 + 1] = 0;
-                output[x * 3 + 2] = 1;
+        }
+    }
+    // for (int i = 0; i<min_val->width; i++) {
+    //     printf("%f, %f\n", min_val->data[i], max_val->data[i]);
+    // }
+
+    for (int i = 0; i < dataset->height; i++) {
+        for (int j = 0; j < dataset->width - 1; j++) {
+            dataset->data[i * dataset->width + j] = (dataset->data[i * dataset->width + j] - min_val->data[j]) / (max_val->data[j] - min_val->data[j]);
+        }
+    }
+}
+
+
+void create_ground_truth(struct Matrix * input, struct Matrix * output)
+{
+    for (int x = 0; x < input->height; x++) {
+            if (input->data[x * input->width + 4] - 0 < .01) {
+                output->data[x * 3 + 0] = 1;
+                output->data[x * 3 + 1] = 0;
+                output->data[x * 3 + 2] = 0;
+            }
+            else if (input->data[x * input->width + 4] - 1 < .01) {
+                output->data[x * 3 + 0] = 0;
+                output->data[x * 3 + 1] = 1;
+                output->data[x * 3 + 2] = 0;
+            }
+            else if (input->data[x * input->width + 4] - 2 < .01) {
+                output->data[x * 3 + 0] = 0;
+                output->data[x * 3 + 1] = 0;
+                output->data[x * 3 + 2] = 1;
             }
             else {
-                output[x * 3 + 0] = 0;
-                output[x * 3 + 1] = 0;
-                output[x * 3 + 2] = 0;
+                output->data[x * 3 + 0] = 0;
+                output->data[x * 3 + 1] = 0;
+                output->data[x * 3 + 2] = 0;
             }
             
     }
