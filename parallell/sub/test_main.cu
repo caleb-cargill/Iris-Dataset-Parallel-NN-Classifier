@@ -49,10 +49,11 @@ int main(void)
     // print_matrix(ground_truth);
 
     int topology[] = {4, 3, 3};
-    int epochs = 10000;
+    int epochs = 50;
     NeuralNetwork net(topology, 2);
     net.train(train,ground_truth,epochs,.001);
     printf("epochs: %d\n", epochs);
+    timer.Stop();
 	printf("\nTime Elapsed: %g ms\n", timer.Elapsed());
     // printf("\n%f\n", dataset[0]);
     // float *inputs, *weights, *outputs;

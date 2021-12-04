@@ -299,10 +299,16 @@ class NeuralNetwork {
                 //     printf("weights[0]:\n");
                 //     print_matrix(this->weights[0]);
                 // }
-                if (i == 9998 || i == 9999)
+                if (i % 10 == 0)
                 {
                     printf("Epoch %i\n", i);
                     calculate_accuracy();
+                    printf("Accuracy: %f\n", this->accuracy);
+                }
+                if (i == 9998 || i == 9999)
+                {
+                    // printf("Epoch %i\n", i);
+                    // calculate_accuracy();
                     // printf("Accuracy: %f\n", this->accuracy);
                     // printf("layer_errors[1]:\n");
                     // print_matrix(this->layer_errors[this->num_layers - 2]);
