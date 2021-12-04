@@ -113,6 +113,7 @@ __global__ void element_wise_multiplication_add1_kernal(float* A, float* B, floa
     }
 }
 
+
 __global__ void calculate_output_error_kernal(float* output, float *ground_truth, float *error, int width,int total)
 {
     int idx = threadIdx.x + blockDim.x * blockIdx.x;
@@ -148,6 +149,7 @@ __global__ void calculate_hidden_error_kernal(float* error, float *weights, floa
             }
         }
     }
+}
 
 
 void element_wise_multiplication(struct Matrix* A, struct Matrix* B, struct Matrix* C, bool add1) {

@@ -72,9 +72,9 @@ void normalize_data(struct Matrix *dataset)
             }
         }
     }
-    for (int i = 0; i<min_val->width; i++) {
-        printf("%f, %f\n", min_val->data[i], max_val->data[i]);
-    }
+    // for (int i = 0; i<min_val->width; i++) {
+    //     printf("%f, %f\n", min_val->data[i], max_val->data[i]);
+    // }
 
     for (int i = 0; i < dataset->height; i++) {
         for (int j = 0; j < dataset->width - 1; j++) {

@@ -7,45 +7,6 @@
 #include "matrix.h"
 #include "cuda.h"
 
-__global__ void calculate_output_error_kernal(float* output, float *ground_truth, float *error, int width,int total)
-{
-    int idx = threadIdx.x + blockDim.x * blockIdx.x;
-    if(idx < total)
-    {
-        for (int i = 0; i < width; i ++)
-        {
-            float temp = (output[idx*width+i] - ground_truth[idx*width+i]);
-            // temp = temp * temp;
-            error[idx*width+i] = temp;
-            error[idx*width+i] *= (output[idx*width+i])*(1-output[idx*width+i]);
-        }
-    }
-}
-
-__global__ void calculate_hidden_error_kernal(float* error, float *weights, float *next_error, float * outputs, int current_width, int next_width,int total)
-{
-    int idx = threadIdx.x + blockDim.x * blockIdx.x;
-    if(idx < total)
-    {
-        for (int i = 0; i < current_width; i++)
-        {   
-            float acc = 0;
-            for (int j = 0; j < next_width; j++)
-            {
-                acc += weights[i*next_width+j]*next_error[idx*next_width+j];
-            }
-            error[idx*current_width+i] = acc;
-            if (i != current_width - 1)
-            {
-                error[idx*current_width+i] *= outputs[idx*current_width+i]*(1-outputs[idx*current_width+i]);
-
-            }
-        }
-    }
-}
-
-
-
 
 class NeuralNetwork {
     private:
@@ -76,7 +37,7 @@ class NeuralNetwork {
                 // weights range from -1/sqrt(n) to 1/sqrt(n) where n is the number of nodes in the previous layer
                 std::uniform_real_distribution<float> distribution(-1.0/sqrt(topology[i]),1.0/sqrt(topology[i]));
 
-                printf("num weights %i\n",(topology[i] + 1) * topology[i + 1]);
+                // printf("num weights %i\n",(topology[i] + 1) * topology[i + 1]);
                 struct Matrix * temp = create_matrix(topology[i] + 1, topology[i + 1]);
 
                 for(int y = 0; y < temp->height* temp->width; y++)
@@ -93,6 +54,7 @@ class NeuralNetwork {
                 // {
                 //     printf("%f\n",temp2[y]);
                 // }
+                matrix_destroy(temp);
             }
 
         }
@@ -101,10 +63,19 @@ class NeuralNetwork {
             printf("Destroying Neural Network\n");
             for (int i = 0; i < num_layers - 1; i++)
             {
-                cudaFree(this->weights[i]);
+                matrix_destroy(this->weights[i]);
+                matrix_destroy(this->layer_errors[i]);
+                matrix_destroy(this->layer_outputs[i]);
             }
             delete[] this->weights;
             delete[] this->topology;
+            delete[] this->layer_errors;
+            delete[] this->layer_outputs;
+            matrix_destroy(this->d_inputs);
+            matrix_destroy(this->d_ground_truth);
+            matrix_destroy(this->d_error);
+            matrix_destroy(this->error);
+
         }
 
         void forward_propagate()
@@ -240,6 +211,9 @@ class NeuralNetwork {
                 update_weights_kernal<<<blocksPerGrid, threadsPerBlock>>>(weights[i]->data, averages->data, weights[i]->height, weights[i]->width, learning_rate);
                 // print_matrix(weights[i]);
                 // printf("\n");
+                matrix_destroy(temp);
+                matrix_destroy(averages);
+                matrix_destroy(delta_weights);
             }
         }
         
@@ -329,15 +303,15 @@ class NeuralNetwork {
                 {
                     printf("Epoch %i\n", i);
                     calculate_accuracy();
-                    printf("Accuracy: %f\n", this->accuracy);
-                    printf("layer_errors[1]:\n");
-                    print_matrix(this->layer_errors[this->num_layers - 2]);
-                    printf("layer_outputs[%d]:\n",this->num_layers - 2);
-                    print_matrix(this->layer_outputs[this->num_layers - 2]);
-                    printf("d_error:\n");
-                    print_matrix(this->d_error);
-                    printf("weights[1]:\n");
-                    print_matrix(this->weights[this->num_layers -2]);
+                    // printf("Accuracy: %f\n", this->accuracy);
+                    // printf("layer_errors[1]:\n");
+                    // print_matrix(this->layer_errors[this->num_layers - 2]);
+                    // printf("layer_outputs[%d]:\n",this->num_layers - 2);
+                    // print_matrix(this->layer_outputs[this->num_layers - 2]);
+                    // printf("d_error:\n");
+                    // print_matrix(this->d_error);
+                    // printf("weights[1]:\n");
+                    // print_matrix(this->weights[this->num_layers -2]);
                 }
             }
 

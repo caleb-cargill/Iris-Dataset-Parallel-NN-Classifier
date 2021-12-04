@@ -6,10 +6,13 @@
 #include "cuda.h"
 #include "matrix.h"
 #include <iostream>
-
+#include "gputimer.h"
 
 int main(void)
 {   
+    GpuTimer timer;
+	timer.Start();
+
     std::string filename = "iris.csv";
 
     int height = 150, width = 5;
@@ -24,8 +27,8 @@ int main(void)
     // printf("File read successfully\n");
       normalize_data(dataset);
 
-    int train_size = 1;
-    
+    int train_size = 100;
+
     struct Matrix *train, *test;
     train = create_matrix(train_size, width);
     test = create_matrix(height - train_size, width);
@@ -38,17 +41,19 @@ int main(void)
     create_ground_truth(train, ground_truth);
     // print_matrix(ground_truth);
     // // validate_split(train, test, height, width, train_size);
-    print_matrix(train);
+    // print_matrix(train);
   
-    printf("\n");
-    print_matrix(train);
-    printf("\n");
-    print_matrix(ground_truth);
+    // printf("\n");
+    // print_matrix(train);
+    // printf("\n");
+    // print_matrix(ground_truth);
 
-    int topology[] = {4, 3};
+    int topology[] = {4, 3, 3};
+    int epochs = 10000;
     NeuralNetwork net(topology, 2);
-    net.train(train,ground_truth,10000,.001);
-
+    net.train(train,ground_truth,epochs,.001);
+    printf("epochs: %d\n", epochs);
+	printf("\nTime Elapsed: %g ms\n", timer.Elapsed());
     // printf("\n%f\n", dataset[0]);
     // float *inputs, *weights, *outputs;
     // int a = 2, b = 3,c = 4;
