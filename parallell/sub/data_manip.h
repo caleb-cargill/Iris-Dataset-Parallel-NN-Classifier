@@ -54,6 +54,36 @@ void validate_split(float *train, float *test, int height, int width, int train_
     }
 }
 
+void normalize_data(struct Matrix *dataset)
+{
+    struct Matrix *max_val = create_matrix(1, dataset->width);
+    struct Matrix *min_val = create_matrix(1, dataset->width);
+    for (int i = 0; i < dataset->width; i++) {
+        max_val->data[i] = dataset->data[i];
+        min_val->data[i] = dataset->data[i];
+    }
+    for (int i = 0; i < dataset->height; i++) {
+        for (int j = 0; j < dataset->width - 1; j++) {
+            if (dataset->data[i * dataset->width + j] < min_val->data[j]) {
+                min_val->data[j] = dataset->data[i * dataset->width + j];
+            }
+            if (dataset->data[i * dataset->width + j] > max_val->data[j]) {
+                max_val->data[j] = dataset->data[i * dataset->width + j];
+            }
+        }
+    }
+    for (int i = 0; i<min_val->width; i++) {
+        printf("%f, %f\n", min_val->data[i], max_val->data[i]);
+    }
+
+    for (int i = 0; i < dataset->height; i++) {
+        for (int j = 0; j < dataset->width - 1; j++) {
+            dataset->data[i * dataset->width + j] = (dataset->data[i * dataset->width + j] - min_val->data[j]) / (max_val->data[j] - min_val->data[j]);
+        }
+    }
+}
+
+
 void create_ground_truth(struct Matrix * input, struct Matrix * output)
 {
     for (int x = 0; x < input->height; x++) {

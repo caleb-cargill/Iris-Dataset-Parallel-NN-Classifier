@@ -22,8 +22,10 @@ int main(void)
     // print_matrix(dataset);
     // printf("\n");
     // printf("File read successfully\n");
+      normalize_data(dataset);
+
+    int train_size = 1;
     
-    int train_size = 2;
     struct Matrix *train, *test;
     train = create_matrix(train_size, width);
     test = create_matrix(height - train_size, width);
@@ -36,11 +38,16 @@ int main(void)
     create_ground_truth(train, ground_truth);
     // print_matrix(ground_truth);
     // // validate_split(train, test, height, width, train_size);
-    
+    print_matrix(train);
+  
+    printf("\n");
+    print_matrix(train);
+    printf("\n");
+    print_matrix(ground_truth);
 
-    int topology[] = {4, 3, 3};
-    NeuralNetwork net(topology, 3);
-    net.train(train,ground_truth,1,.1);
+    int topology[] = {4, 3};
+    NeuralNetwork net(topology, 2);
+    net.train(train,ground_truth,10000,.001);
 
     // printf("\n%f\n", dataset[0]);
     // float *inputs, *weights, *outputs;
