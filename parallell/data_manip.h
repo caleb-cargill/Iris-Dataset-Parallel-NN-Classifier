@@ -20,10 +20,6 @@ void create_sample_array(int *sample_array, int sample_size)
 void split_data (struct Matrix * dataset, struct Matrix *train, struct Matrix *test) {
     int *sample_array = (int *) malloc(dataset->height * sizeof(int));
     create_sample_array(sample_array, dataset->height);
-    // validate shuffle
-    // for (int i = 0; i < height; i++) {
-    //     printf("%d\n", sample_array[i]);
-    // }
     for (int i = 0; i < dataset->height; i++) {
 
         for(int j = 0; j < dataset->width; j++) {
@@ -72,9 +68,6 @@ void normalize_data(struct Matrix *dataset)
             }
         }
     }
-    // for (int i = 0; i<min_val->width; i++) {
-    //     printf("%f, %f\n", min_val->data[i], max_val->data[i]);
-    // }
 
     for (int i = 0; i < dataset->height; i++) {
         for (int j = 0; j < dataset->width - 1; j++) {

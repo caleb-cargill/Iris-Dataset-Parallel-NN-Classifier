@@ -10,16 +10,6 @@ struct Matrix {
     float *data;
 };
 
-// struct Matrix *create_matrix(int height, int width);
-// struct Matrix *create_cuda_matrix(int height, int width);
-// void matrix_destroy(Matrix *matrix);
-// void print_matrix(Matrix *matrix);
-// void send_matrix_to_gpu(Matrix *matrix, Matrix *d_matrix);
-// struct Matrix *send_matrix_to_gpu(Matrix *matrix);
-// void retrieve_matrix_from_gpu(Matrix *matrix, Matrix *d_matrix);
-// Matrix *retrieve_matrix_from_gpu(Matrix *d_matrix);
-
-
 struct Matrix* create_matrix(int height, int width) {
     Matrix *matrix = (Matrix *) malloc(sizeof(Matrix));
     matrix->width = width;

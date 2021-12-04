@@ -33,13 +33,6 @@ void matrix_multiplication(float* A, float* B, float* C, int a, int b, int c) {
     cudaMemcpy(d_a, A,  a * b * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(d_b, B,  b * c * sizeof(float), cudaMemcpyHostToDevice);
 
-    // for(int y = 0; y < a; y++) {
-    //     for(int x = 0; x < b; x++){
-    //         printf("%f ", A[y * b + x]);
-    //     }
-    //     printf("\n");
-    // }
-
     dim3 threadsPerBlock(c, a);
     dim3 blocksPerGrid(1, 1);
         if (c*a > 512){
@@ -77,9 +70,9 @@ __global__ void nn_matrix_multiplication_kernel(float* inputs, float* weights, f
 }
 
 void nn_mat_mul(struct Matrix* inputs, struct Matrix* weights, struct Matrix* outputs) {
-    // printf("%d %d %d\n", inputs->height, inputs->width, outputs->height);
+
     dim3 threadsPerBlock(outputs->width, inputs->height);
-    // std::cout << "threadsPerBlock: " << threadsPerBlock.x << " " << threadsPerBlock.y << std::endl;
+
     dim3 blocksPerGrid(1, 1);
         if (outputs->width * inputs->height > 512){
             threadsPerBlock.x = 512;
@@ -122,7 +115,6 @@ __global__ void calculate_output_error_kernal(float* output, float *ground_truth
         for (int i = 0; i < width; i ++)
         {
             float temp = (output[idx*width+i] - ground_truth[idx*width+i]);
-            // temp = temp * temp;
             error[idx*width+i] = temp;
             error[idx*width+i] *= (output[idx*width+i])*(1-output[idx*width+i]);
         }
