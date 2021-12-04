@@ -41,6 +41,25 @@ int main(void)
         }
     }
     print_matrix(output);
+    printf("\n");
+    print_matrix(ground_truth);
+
+    struct Matrix * avg = create_cuda_matrix(1, width);
+
+    int num_threads = output->width;
+    int num_blocks = 1;
+    if (num_threads > 512)
+    {
+        num_threads = 512;
+        num_blocks = ceil(float(output->width) / 512.0);
+    }
+    print_matrix(output);
+    d_output = send_matrix_to_gpu(output);
+    average_columns_kernal<<<num_blocks, num_threads>>>(d_output->data, avg->data, output->height,output->width);
+    print_matrix(avg);
+    // element_wise_multiplication(send_matrix_to_gpu(output), send_matrix_to_gpu(ground_truth), d_error);
+    // print_matrix(d_error);
+    
     // print_matrix(output);
     // for (int i = 0; i < num_samples; i++)
     // {
